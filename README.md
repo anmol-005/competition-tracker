@@ -69,6 +69,6 @@ Install the required Python libraries using the requirements.txt file.
 ### 4. Install Playwright Browsers
 The crawl4ai library uses Playwright to control a web browser. You need to install the necessary browser binaries. Run the following command to install Chromium.
 
-Bash
-
 ```python -m playwright install chromium```
+
+After this, you're all set to run the project!
