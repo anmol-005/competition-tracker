@@ -42,7 +42,7 @@ Follow these steps to get the project running on your local machine.
 
 ### 1. Clone the Repository
 First, clone this repository to your local machine.
-```bash
+```
 git clone [https://github.com/your-username/competitor-strategy-tracker.git](https://github.com/your-username/competitor-strategy-tracker.git)
 cd competitor-strategy-tracker
 ```
@@ -50,17 +50,25 @@ cd competitor-strategy-tracker
 ### 2. Create a Virtual Environment
 It's highly recommended to use a virtual environment to manage project dependencies.
 
-```On macOS/Linux:
-
-Bash
-
+```
+On macOS/Linux:
 python3 -m venv venv
-source venv/bin/activate```
+source venv/bin/activate
+```
 
-```On Windows:
-
-Bash
-
+```
+On Windows:
 python -m venv venv
 .\venv\Scripts\activate
 ```
+### 3. Install Dependencies
+Install the required Python libraries using the requirements.txt file.
+
+```pip install -r requirements.txt```
+
+### 4. Install Playwright Browsers
+The crawl4ai library uses Playwright to control a web browser. You need to install the necessary browser binaries. Run the following command to install Chromium.
+
+Bash
+
+```python -m playwright install chromium```
