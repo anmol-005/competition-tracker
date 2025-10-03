@@ -15,3 +15,23 @@ This initial phase of the project focused on setting up the core infrastructure,
 * ✅ **Tool Training:** Familiarized the team with the core technologies, including LLMs and web scraping tools.
 * ✅ **Initial Data Collection:** Developed and tested initial scripts to gather pricing and discount data from target e-commerce platforms.
 
+### 👨‍💻 Our Team: Cognitive Crew
+
+The team is fully assembled with clearly defined roles and responsibilities.
+
+| Member Name | Role | Tech Stack to be Used |
+| :--- | :--- | :--- |
+| **Dinesh** (Team lead) | Frontend | React |
+| **Anmol Kansal** (Assistant lead) | Backend | Python, FastAPI |
+| **Ankita Barui** | Backend | Python, FastAPI |
+| **Roshan Vishwakarma** | Database | MongoDB |
+| **Sharanya** | Backend and UI/UX | Python, FastAPI |
+
+---
+
+## ✅ Milestone 1 Completion Details
+
+Milestone 1 is considered **complete** and the project foundation is successfully established.
+
+* **Team Readiness:** As detailed in the team table above, all roles have been assigned and the tech stack for each module has been finalized. Team members are prepared to proceed with their designated tasks.
+* **Initial Scraper Implementation:** The core task of setting up data collection tools is finished. A functional web scraper targeting **Amazon.in** has been developed using the `crawl4ai` library. This script, located at `src/scrapers/amazon_scraper.py`, is capable of collecting initial pricing and discount data, fulfilling a key objective of this milestone.
