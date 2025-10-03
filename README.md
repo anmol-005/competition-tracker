@@ -43,7 +43,7 @@ Follow these steps to get the project running on your local machine.
 ### 1. Clone the Repository
 First, clone this repository to your local machine.
 ```
-git clone [https://github.com/your-username/competitor-strategy-tracker.git](https://github.com/your-username/competitor-strategy-tracker.git)
+git clone [https://github.com/anmol-005/competition-tracker.git](https://github.com/anmol-005/competition-tracker.git)
 cd competitor-strategy-tracker
 ```
 
