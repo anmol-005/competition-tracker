@@ -35,3 +35,29 @@ Milestone 1 is considered **complete** and the project foundation is successfull
 
 * **Team Readiness:** As detailed in the team table above, all roles have been assigned and the tech stack for each module has been finalized. Team members are prepared to proceed with their designated tasks.
 * **Initial Scraper Implementation:** The core task of setting up data collection tools is finished. A functional web scraper targeting **Amazon.in** has been developed using the `crawl4ai` library. This script is capable of collecting initial pricing and discount data, ratings, fulfilling a key objective of this milestone.
+
+## 🚀 Setup and Installation
+
+Follow these steps to get the project running on your local machine.
+
+### 1. Clone the Repository
+First, clone this repository to your local machine.
+```bash
+git clone [https://github.com/your-username/competitor-strategy-tracker.git](https://github.com/your-username/competitor-strategy-tracker.git)
+cd competitor-strategy-tracker
+
+### 2. Create a Virtual Environment
+It's highly recommended to use a virtual environment to manage project dependencies.
+
+On macOS/Linux:
+
+Bash
+
+python3 -m venv venv
+source venv/bin/activate
+On Windows:
+
+Bash
+
+python -m venv venv
+.\venv\Scripts\activate
