@@ -34,4 +34,4 @@ The team is fully assembled with clearly defined roles and responsibilities.
 Milestone 1 is considered **complete** and the project foundation is successfully established.
 
 * **Team Readiness:** As detailed in the team table above, all roles have been assigned and the tech stack for each module has been finalized. Team members are prepared to proceed with their designated tasks.
-* **Initial Scraper Implementation:** The core task of setting up data collection tools is finished. A functional web scraper targeting **Amazon.in** has been developed using the `crawl4ai` library. This script, located at `src/scrapers/amazon_scraper.py`, is capable of collecting initial pricing and discount data, fulfilling a key objective of this milestone.
+* **Initial Scraper Implementation:** The core task of setting up data collection tools is finished. A functional web scraper targeting **Amazon.in** has been developed using the `crawl4ai` library. This script is capable of collecting initial pricing and discount data, ratings, fulfilling a key objective of this milestone.
