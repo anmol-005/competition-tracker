@@ -2,47 +2,48 @@ import ProductGrid from "@/components/ProductGrid";
 import { useToast } from "@/hooks/use-toast";
 
 // todo: remove mock functionality - replace with real product data
-import nikeAirMax from "@assets/generated_images/Nike_Air_Max_sneakers_d0062d9e.png";
-import adidasUltraBoost from "@assets/generated_images/Adidas_UltraBoost_shoes_d95acb11.png";
-import jordan1 from "@assets/generated_images/Jordan_1_basketball_shoes_62dd8242.png";
-import converse from "@assets/generated_images/Converse_Chuck_Taylor_shoes_494ce332.png";
-import vansOldSkool from "@assets/generated_images/Vans_Old_Skool_shoes_93f89519.png";
+import macbookImage from "@assets/generated_images/Nike_Air_Max_sneakers_d0062d9e.png";
 
 const MOCK_PRODUCTS = [
   {
-    id: "1",
-    name: "Air Max 270",
-    brand: "Nike",
-    price: 150,
-    image: nikeAirMax
+    id: "B0B94152F6",
+    name: "MacBook Air M2 8GB/256GB",
+    brand: "Apple",
+    price: 110000,
+    image: macbookImage,
+    description: "Midnight"
   },
   {
-    id: "2", 
-    name: "UltraBoost 22",
-    brand: "Adidas",
-    price: 180,
-    image: adidasUltraBoost
+    id: "B0B94213G7",
+    name: "MacBook Air M2 16GB/512GB",
+    brand: "Apple",
+    price: 140000,
+    image: macbookImage,
+    description: "Starlight"
   },
   {
-    id: "3",
-    name: "Air Jordan 1 Retro",
-    brand: "Jordan",
-    price: 170,
-    image: jordan1
+    id: "B0CJ5KWD22",
+    name: "MacBook Pro M3 8GB/512GB",
+    brand: "Apple",
+    price: 169900,
+    image: macbookImage,
+    description: "Space Grey"
   },
   {
-    id: "4",
-    name: "Chuck Taylor All Star",
-    brand: "Converse", 
-    price: 65,
-    image: converse
+    id: "B0CJ5LSM38",
+    name: "MacBook Pro M3 Pro 18GB/512GB",
+    brand: "Apple",
+    price: 199900,
+    image: macbookImage,
+    description: "Space Black"
   },
   {
-    id: "5",
-    name: "Old Skool",
-    brand: "Vans",
-    price: 65,
-    image: vansOldSkool
+    id: "B08N5XSG8Z",
+    name: "MacBook Air M1 8GB/256GB",
+    brand: "Apple",
+    price: 99900,
+    image: macbookImage,
+    description: "Silver"
   }
 ];
 
@@ -68,10 +69,10 @@ export default function HomePage({ onAddToCart, cartItemCount }: HomePageProps) 
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="text-page-title">
-          Featured Shoes
+          Featured Products
         </h1>
         <p className="text-muted-foreground" data-testid="text-page-subtitle">
-          Discover our curated collection of premium sneakers
+          Discover our curated collection of premium MacBooks
         </p>
       </div>
       
