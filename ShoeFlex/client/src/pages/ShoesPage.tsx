@@ -1,6 +1,5 @@
 import ProductGrid from "@/components/ProductGrid";
 import { useToast } from "@/hooks/use-toast";
-
 // todo: remove mock functionality - replace with real product data
 import nikeAirMax from "@assets/generated_images/Nike_Air_Max_sneakers_d0062d9e.png";
 import adidasUltraBoost from "@assets/generated_images/Adidas_UltraBoost_shoes_d95acb11.png";
@@ -10,39 +9,69 @@ import vansOldSkool from "@assets/generated_images/Vans_Old_Skool_shoes_93f89519
 
 const MOCK_PRODUCTS = [
   {
-    id: "1",
-    name: "Air Max 270",
-    brand: "Nike",
-    price: 150,
-    image: nikeAirMax
+    id: "B0B94152F6",
+    name: "MacBook Air M2",
+    brand: "Apple",
+    price: 110000,
+    image: nikeAirMax,
+    specs: {
+      release_year: 2022,
+      ram_gb: 8,
+      storage_gb: 256,
+      color: "Midnight"
+    }
   },
   {
-    id: "2", 
-    name: "UltraBoost 22",
-    brand: "Adidas",
-    price: 180,
-    image: adidasUltraBoost
+    id: "B0B94213G7",
+    name: "MacBook Air M2",
+    brand: "Apple",
+    price: 140000,
+    image: adidasUltraBoost,
+    specs: {
+      release_year: 2022,
+      ram_gb: 16,
+      storage_gb: 512,
+      color: "Starlight"
+    }
   },
   {
-    id: "3",
-    name: "Air Jordan 1 Retro",
-    brand: "Jordan",
-    price: 170,
-    image: jordan1
+    id: "B0CJ5KWD22",
+    name: "MacBook Pro M3",
+    brand: "Apple",
+    price: 169900,
+    image: jordan1,
+    specs: {
+      release_year: 2023,
+      ram_gb: 8,
+      storage_gb: 512,
+      color: "Space Grey"
+    }
   },
   {
-    id: "4",
-    name: "Chuck Taylor All Star",
-    brand: "Converse", 
-    price: 65,
-    image: converse
+    id: "B0CJ5LSM38",
+    name: "MacBook Pro M3 Pro",
+    brand: "Apple",
+    price: 199900,
+    image: converse,
+    specs: {
+      release_year: 2023,
+      ram_gb: 18,
+      storage_gb: 512,
+      color: "Space Black"
+    }
   },
   {
-    id: "5",
-    name: "Old Skool",
-    brand: "Vans",
-    price: 65,
-    image: vansOldSkool
+    id: "B08N5XSG8Z",
+    name: "MacBook Air M1",
+    brand: "Apple",
+    price: 99900,
+    image: vansOldSkool,
+    specs: {
+      release_year: 2020,
+      ram_gb: 8,
+      storage_gb: 256,
+      color: "Silver"
+    }
   }
 ];
 
