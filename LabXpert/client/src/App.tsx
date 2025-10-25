@@ -1,71 +1,69 @@
-import { useState } from "react";
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Navbar from "@/components/Navbar";
-import LoginPage from "@/pages/LoginPage";
-import HomePage from "@/pages/HomePage";
-import ShoesPage from "@/pages/ShoesPage";
-import CartPage from "@/pages/CartPage";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { CartProvider } from "@/components/CartProvider";
+import { useEffect, useState } from "react";
+import LoginPage from "@/pages/login";
+import HomePage from "@/pages/home";
+import ProductsPage from "@/pages/products";
+import CartPage from "@/pages/cart";
 import NotFound from "@/pages/not-found";
 
-function Router() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [cartItems, setCartItems] = useState<string[]>([]);
+function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [, setLocation] = useLocation();
 
-  const handleLogin = (email: string, password: string) => {
-    console.log("Login successful:", { email }); //todo: remove mock functionality
-    setIsLoggedIn(true);
-    setLocation("/home");
-  };
+  useEffect(() => {
+    const auth = localStorage.getItem("isAuthenticated") === "true";
+    setIsAuthenticated(auth);
+    
+    if (!auth) {
+      setLocation("/login");
+    }
+  }, [setLocation]);
 
-  const handleLogout = () => {
-    console.log("User logged out"); //todo: remove mock functionality
-    setIsLoggedIn(false);
-    setCartItems([]);
-    setLocation("/login");
-  };
+  if (isAuthenticated === null) {
+    return null;
+  }
 
-  const handleAddToCart = (productId: string) => {
-    setCartItems(prev => [...prev, productId]);
-  };
+  return isAuthenticated ? <Component /> : null;
+}
 
+function Router() {
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar isLoggedIn={isLoggedIn} onLogout={handleLogout} cartItemCount={cartItems.length} />
-      
-      <Switch>
-        <Route path="/login">
-          <LoginPage onLogin={handleLogin} />
-        </Route>
-        <Route path="/home">
-          {isLoggedIn ? <HomePage onAddToCart={handleAddToCart} cartItemCount={cartItems.length} /> : <LoginPage onLogin={handleLogin} />}
-        </Route>
-        <Route path="/shoes">
-          {isLoggedIn ? <ShoesPage onAddToCart={handleAddToCart} /> : <LoginPage onLogin={handleLogin} />}
-        </Route>
-        <Route path="/cart">
-          {isLoggedIn ? <CartPage cartItems={cartItems} setCartItems={setCartItems} /> : <LoginPage onLogin={handleLogin} />}
-        </Route>
-        <Route path="/">
-          {isLoggedIn ? <HomePage onAddToCart={handleAddToCart} cartItemCount={cartItems.length} /> : <LoginPage onLogin={handleLogin} />}
-        </Route>
-        <Route component={NotFound} />
-      </Switch>
-    </div>
+    <Switch>
+      <Route path="/login" component={LoginPage} />
+      <Route path="/home">
+        <ProtectedRoute component={HomePage} />
+      </Route>
+      <Route path="/products">
+        <ProtectedRoute component={ProductsPage} />
+      </Route>
+      <Route path="/cart">
+        <ProtectedRoute component={CartPage} />
+      </Route>
+      <Route path="/">
+        <Redirect to="/login" />
+      </Route>
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <ThemeProvider defaultTheme="light">
+        <CartProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </CartProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
