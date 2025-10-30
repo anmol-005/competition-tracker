@@ -10,34 +10,53 @@ from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 # Import database utilities
 from scraper_db_utils import db_manager
 
-async def scrape_amazon(product_name: str, max_items: int = 10, retries: int = 3):
-    print(f"🕵️  Deploying Digital Spy for: '{product_name}' on Amazon.in...")
-    search_url = f"https://www.amazon.in/s?k={quote(product_name)}"
+async def scrape_flipkart(product_name: str, max_items: int = 10, retries: int = 3):
+    print(f"🕵️  Deploying Digital Spy for: '{product_name}' on Flipkart.com...")
+    search_url = f"https://www.flipkart.com/search?q={quote(product_name)}"
     
-    browser_cfg = BrowserConfig(headless=False)
+    browser_cfg = BrowserConfig(
+        headless=False,
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    )
 
     schema = {
-        "name": "AmazonIntelligence",
-        "baseSelector": "div.s-main-slot div[data-component-type='s-search-result']",
+        "name": "FlipkartIntelligence",
+        "baseSelector": "div[data-id], div._13oc-S, div._1AtVbE",
         "fields": [
-            {"name": "title", "selector": "h2 a span, h2 span", "type": "text"},
-            {"name": "price_whole", "selector": "span.a-price-whole", "type": "text"},
-            {"name": "price_fraction", "selector": "span.a-price-fraction", "type": "text"},
-            {"name": "list_price", "selector": "span.a-price.a-text-price span.a-offscreen", "type": "text"},
-            {"name": "rating", "selector": "span.a-icon-alt, i.a-icon-star span.a-icon-alt", "type": "text"},
-            {"name": "reviews", "selector": "span.a-size-base.s-underline-text, a.a-link-normal span.a-size-base", "type": "text"},
-            {"name": "link", "selector": "h2 a, a.a-link-normal.s-no-outline", "type": "attribute", "attribute": "href"},
-            {"name": "image", "selector": "img.s-image", "type": "attribute", "attribute": "src"}
+            {"name": "title", "selector": "div.KzDlHZ, a.IRpwTa, div._4rR01T, div.s1Q9rs", "type": "text"},
+            {"name": "price", "selector": "div._30jeq3._1_WHN1, div._1_WHN1, div.Nx9bqj", "type": "text"},
+            {"name": "original_price", "selector": "div.yRaY8j.ZYYwLA, div._3I9_wc._27UcVY, div._3auQ3N", "type": "text"},
+            {"name": "discount", "selector": "div._3Ay6Sb._31Dcoz, div._3Ay6Sb, span._2Tpdn3", "type": "text"},
+            {"name": "rating", "selector": "div._3LWZlK, div.XQDdHH, span._2_R_DZ", "type": "text"},
+            {"name": "reviews", "selector": "span._2_R_DZ:last-child, span.Wphh3N", "type": "text"},
+            {"name": "link", "selector": "a.IRpwTa, a._1fQZEK, a.s1Q9rs", "type": "attribute", "attribute": "href"},
+            {"name": "image", "selector": "img._396cs4, img._2r_T1I", "type": "attribute", "attribute": "src"}
         ]
     }
 
     extraction_strategy = JsonCssExtractionStrategy(schema)
-    run_cfg = CrawlerRunConfig(extraction_strategy=extraction_strategy)
+    run_cfg = CrawlerRunConfig(
+        extraction_strategy=extraction_strategy,
+        delay_before_return_html=3,
+        wait_for="css:div[data-id], div._13oc-S",
+        js_code=[
+            "window.scrollTo(0, document.body.scrollHeight/4);",
+            "await new Promise(resolve => setTimeout(resolve, 2000));",
+            "window.scrollTo(0, document.body.scrollHeight/2);"
+        ]
+    )
 
     async with AsyncWebCrawler(config=browser_cfg) as crawler:
         result = None
         for attempt in range(1, retries + 1):
             print(f"  -> Spy is on attempt {attempt}/{retries}...")
+            
+            # Add random delay between attempts
+            if attempt > 1:
+                delay = attempt * 2
+                print(f"  -> Waiting {delay} seconds before retry...")
+                await asyncio.sleep(delay)
+            
             result = await crawler.arun(url=search_url, config=run_cfg)
 
             if result and result.extracted_content and result.extracted_content.strip() not in ("[]", ""):
@@ -45,10 +64,13 @@ async def scrape_amazon(product_name: str, max_items: int = 10, retries: int = 3
                 break
             else:
                 print(f"  -> ⚠️ Attempt {attempt} failed. Retrying...")
+                # Check if we got HTML content (might be blocked page)
+                if result and result.html:
+                    print(f"  -> Received HTML content: {len(result.html)} characters")
                 await asyncio.sleep(3)
 
     if not result or not result.extracted_content or result.extracted_content.strip() in ("[]", ""):
-        debug_filename = "amazon_spy_blocked.html"
+        debug_filename = "flipkart_spy_blocked.html"
         with open(debug_filename, "w", encoding="utf-8") as f:
             f.write(result.html if result else "No HTML content received.")
         print(f"❌ Spy was blocked. Saved raw HTML to '{debug_filename}' for inspection.")
@@ -105,20 +127,20 @@ async def scrape_amazon(product_name: str, max_items: int = 10, retries: int = 3
             print(f"  -> FILTERED OUT: '{title[:60]}...' (Is an accessory)")
             continue
 
-        price = None
-        if it.get("price_whole"):
-            frac = it.get("price_fraction", "")
-            price = it["price_whole"] + (("." + frac) if frac else "")
+        price = it.get("price", "").strip()
+        original_price = it.get("original_price", "").strip()
+        discount = it.get("discount", "").strip()
         
         link = it.get("link")
         if link and link.startswith("/"):
-            link = "https://www.amazon.in" + link
+            link = "https://www.flipkart.com" + link
 
         cleaned_report.append({
             "product_title": title,
             "selling_price": price,
-            "original_price_mrp": it.get("list_price"),
-            "star_rating": it.get("rating", "N/A").strip(),
+            "original_price_mrp": original_price,
+            "discount_percentage": discount,
+            "star_rating": (it.get("rating") or "N/A").strip(),
             "review_count": it.get("reviews", "N/A"),
             "product_link": link
         })
@@ -143,7 +165,7 @@ async def save_report_to_database(report_data: list, search_query: str, filename
     success = False
     try:
         if await db_manager.connect():
-            success = await db_manager.store_amazon_scraping_data(report_data, search_query)
+            success = await db_manager.store_flipkart_scraping_data(report_data, search_query)
             await db_manager.close()
             
             if success:
@@ -175,10 +197,10 @@ async def save_report_to_database(report_data: list, search_query: str, filename
 
 
 async def main():
-    """Main function to run Amazon scraper with database integration"""
+    """Main function to run Flipkart scraper with database integration"""
     try:
         query = input("Enter Product Name to spy on: ")
-        results = await scrape_amazon(query)
+        results = await scrape_flipkart(query)
 
         if results:
             print("\n--- 🕵️ SPY REPORT ---")
@@ -188,6 +210,8 @@ async def main():
                 print(f"  Selling Price: {p['selling_price']}")
                 if p['original_price_mrp']:
                     print(f"  ‼️ DISCOUNT DETECTED: Was {p['original_price_mrp']}")
+                if p.get('discount_percentage'):
+                    print(f"  💰 Discount: {p['discount_percentage']}")
                 print(f"  Rating: {p['star_rating']}")
                 print(f"  Reviews: {p['review_count']}")
                 print(f"  Link: {p['product_link']}")

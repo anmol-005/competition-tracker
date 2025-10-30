@@ -1,0 +1,102 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.atlas
+*.env
+config.ini
+secrets/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+competitor_intelligence_db.json
+smartprix_intelligence_db.json
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Node.js (LabXpert)
+node_modules/
+.npm
+.yarn-integrity
+dist/
+build/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Scraped data (optional - uncomment if you don't want to track scraped data)
+# scraped_data/
+# *.json
+
+# AI/ML models
+*.pkl
+*.joblib
+models/
+
+# Replit specific
+.replit
+replit.nix

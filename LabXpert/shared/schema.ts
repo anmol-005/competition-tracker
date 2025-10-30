@@ -1,22 +1,45 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// User schema for authentication
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+// User interface for MongoDB documents
+export interface User {
+  _id?: string;
+  id?: string;
+  username?: string;
+  email?: string;
+  password: string;
+  role: string;
+  created_at: Date;
+  last_login?: Date;
+  is_active: boolean;
+}
+
+// Validation schemas for user registration/login
+export const insertUserSchema = z.object({
+  username: z.string().min(3, 'Username must be at least 3 characters').optional(),
+  email: z.string().email('Invalid email format').optional(),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+}).refine((data) => data.username || data.email, {
+  message: "Either username or email is required",
+  path: ["username"]
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const loginSchema = z.object({
+  identifier: z.string().min(3, 'Username or email must be at least 3 characters'),
+  password: z.string().min(6, 'Password must be at least 6 characters')
+});
+
+export const registerSchema = z.object({
+  identifier: z.string().min(3, 'Username or email must be at least 3 characters'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string().min(6, 'Confirm password must be at least 6 characters')
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"]
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type LoginRequest = z.infer<typeof loginSchema>;
+export type RegisterRequest = z.infer<typeof registerSchema>;
 
 // Product interface for laptop products
 export interface Product {

@@ -7,6 +7,9 @@ from crawl4ai import AsyncWebCrawler
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
+# Import database utilities
+from scraper_db_utils import db_manager
+
 
 async def scrape_product_name(url: str, retries: int = 3) -> str:
     """
@@ -20,8 +23,8 @@ async def scrape_product_name(url: str, retries: int = 3) -> str:
         "name": "ProductName",
         "baseSelector": "body", # Look at the whole page
         "fields": [
-            # Selector for the product name heading
-            {"name": "product_name", "selector": "div.Vu3-9u", "type": "text"},
+            # Multiple selectors for product name - Flipkart changes these frequently
+            {"name": "product_name", "selector": "div.Vu3-9u, span.B_NuCI, h1.x-product-title-label, span._35KyD6", "type": "text"},
         ]
     }
     extraction_strategy = JsonCssExtractionStrategy(schema)
@@ -54,12 +57,12 @@ async def scrape_flipkart_reviews(url: str, max_reviews: int = 10, retries: int 
 
     schema = {
         "name": "FlipkartReviews",
-        "baseSelector": "div.EKFha-",
+        "baseSelector": "div._1AtVbE, div.EKFha-, div._16PBlm",
         "fields": [
-            {"name": "rating", "selector": "div.XQDdHH", "type": "text"},
-            {"name": "summary", "selector": "p.z9E0IG", "type": "text"},
-            {"name": "text", "selector": "div.ZmyHeo div div", "type": "text"},
-            {"name": "name", "selector": "p._2NsDsF.AwS1CA", "type": "text"}
+            {"name": "rating", "selector": "div.XQDdHH, div._3LWZlK, div.hGSR34 div._3LWZlK", "type": "text"},
+            {"name": "summary", "selector": "p.z9E0IG, p._2-N8zT, div._2-N8zT", "type": "text"},
+            {"name": "text", "selector": "div.ZmyHeo div div, div.t-ZTKy div div, div._16PBlm div", "type": "text"},
+            {"name": "name", "selector": "p._2NsDsF.AwS1CA, p._2sc7ZR._2V5EHH, div._2V5EHH", "type": "text"}
         ]
     }
 
@@ -95,16 +98,34 @@ async def scrape_flipkart_reviews(url: str, max_reviews: int = 10, retries: int 
     print(f"\n📝 Found {len(reviews)} reviews on this page.")
     return reviews[:max_reviews]
 
-def save_report_to_database(product_report: dict, filename="flipkart_reviews_db.json"):
+async def save_report_to_database(product_report: dict, filename="flipkart_reviews_db.json"):
     """
-    Saves the structured product report to a JSON file.
-    The file will contain a list of product reports.
+    Save report to both MongoDB and JSON file (backup)
     """
     if not product_report or not product_report.get("reviews"):
         print("\nNo new data to save.")
-        return
+        return False
         
-    print(f"\n💾 Saving report to our reviews database ('{filename}')...")
+    print(f"\n💾 Saving report to MongoDB database...")
+    
+    # Connect to database and store data
+    success = False
+    try:
+        if await db_manager.connect():
+            success = await db_manager.store_flipkart_reviews_data(product_report)
+            await db_manager.close()
+            
+            if success:
+                print(f"  -> ✅ Report successfully saved to MongoDB database.")
+            else:
+                print(f"  -> ⚠️ Failed to save to MongoDB, saving to JSON backup instead.")
+        else:
+            print(f"  -> ⚠️ Database connection failed, saving to JSON backup instead.")
+    except Exception as e:
+        print(f"  -> ⚠️ Database error: {e}. Saving to JSON backup instead.")
+    
+    # Always save to JSON as backup
+    print(f"\n💾 Saving backup to JSON file ('{filename}')...")
     database = []
     if os.path.exists(filename):
         with open(filename, 'r', encoding='utf-8') as f:
@@ -119,7 +140,8 @@ def save_report_to_database(product_report: dict, filename="flipkart_reviews_db.
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(database, f, indent=4, ensure_ascii=False)
             
-    print(f"  -> ✅ Report successfully saved. Total product reports in DB: {len(database)}")
+    print(f"  -> ✅ JSON backup saved successfully. Total product reports in DB: {len(database)}")
+    return True
 
 async def main():
     """
@@ -173,7 +195,7 @@ async def main():
         print(f"--- Total Reviews Scraped: {len(all_reviews)} ---")
         
         # Save the single, structured report to the database file
-        save_report_to_database(product_report)
+        await save_report_to_database(product_report)
     else:
         print("\n--- End of Report: No reviews found or scraping failed. ---")
 

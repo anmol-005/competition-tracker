@@ -1,2 +1,42 @@
+# Competition Tracker - Complete Dependencies
+# Web Scraping
 crawl4ai
 playwright
+aiohttp
+cloudscraper
+beautifulsoup4
+
+# MongoDB & Database
+motor>=3.3.0                 # Async MongoDB driver
+pymongo>=4.6.0               # MongoDB Python driver  
+dnspython>=2.4.0             # Required for MongoDB Atlas
+
+# Backend API Framework
+fastapi>=0.104.0             # Modern web framework
+uvicorn>=0.24.0              # ASGI server
+pydantic>=2.5.0              # Data validation
+python-multipart>=0.0.6     # Form data support
+
+# Authentication & Security
+passlib[bcrypt]>=1.7.4       # Password hashing
+python-jose[cryptography]>=3.3.0  # JWT tokens
+bcrypt>=4.0.1                # Password encryption
+
+# Data Processing
+pandas>=2.0.0                # Data analysis
+numpy>=1.24.0                # Numerical computing
+python-dateutil>=2.8.0       # Date parsing
+
+# Configuration & Environment
+python-dotenv>=1.0.0         # Environment variables
+pyyaml>=6.0                  # YAML files
+
+# CORS for frontend
+fastapi-cors>=0.0.1          # Cross-origin requests
+
+# Logging & Monitoring
+structlog>=23.0.0            # Structured logging
+
+# Testing
+pytest>=7.4.0               # Testing framework
+pytest-asyncio>=0.21.0      # Async testing
