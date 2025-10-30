@@ -32,7 +32,7 @@ A comprehensive competitive intelligence tool for e-commerce businesses featurin
 | :--- | :--- | :--- |
 | **Dinesh** (Team Lead) | Frontend Architecture | React.js |
 | **Anmol Kansal** (Assistant Lead) | Backend | Python , FastAPI |
-| **Ankita Barui** | Backend | Python, Data Processing |
+| **Ankita Barui** | Backend | Python, FastAPI |
 | **Roshan Vishwakarma** | Database & AI Integration  | MongoDB, Python |
 | **Sharanya** | Full-Stack & Design | Python, FastAPI, UI/UX |
 
