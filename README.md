@@ -30,10 +30,10 @@ A comprehensive competitive intelligence tool for e-commerce businesses featurin
 
 | Member Name | Role | Contributions |
 | :--- | :--- | :--- |
-| **Dinesh** (Team Lead) | Frontend Architecture | React.js, UI/UX Design |
-| **Anmol Kansal** (Assistant Lead) | Backend & AI Integration | Python, Google AI, API Development |
-| **Ankita Barui** | Data Engineering | Python, Web Scraping, Data Processing |
-| **Roshan Vishwakarma** | Database Architecture | MongoDB, Data Storage, Schema Design |
+| **Dinesh** (Team Lead) | Frontend Architecture | React.js |
+| **Anmol Kansal** (Assistant Lead) | Backend | Python , FastAPI |
+| **Ankita Barui** | Backend | Python, Data Processing |
+| **Roshan Vishwakarma** | Database & AI Integration  | MongoDB, Python |
 | **Sharanya** | Full-Stack & Design | Python, FastAPI, UI/UX |
 
 ---
