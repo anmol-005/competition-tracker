@@ -612,7 +612,58 @@ class CompetitionTrackerDB:
         except Exception as e:
             logger.error(f"❌ Error getting dashboard stats: {e}")
             return {"error": str(e)}
+        
+        async def get_all_users(self):
+            cursor = self.db["users"].find({}, {
+            "_id": 1, "username": 1, "email": 1, "role": 1,
+            "is_active": 1, "flagged": 1, "created_at": 1
+        })
+        return await cursor.to_list(None)
 
+    async def flag_user(self, user_id):
+        result = await self.db["users"].update_one(
+            {"_id": ObjectId(user_id)}, {"$set": {"flagged": True}}
+        )
+        return {"success": result.modified_count > 0, "message": "User flagged"}
+
+    async def ban_user(self, user_id):
+        result = await self.db["users"].update_one(
+            {"_id": ObjectId(user_id)}, {"$set": {"is_active": False}}
+        )
+        return {"success": result.modified_count > 0, "message": "User banned"}
+
+    async def unban_user(self, user_id):
+        result = await self.db["users"].update_one(
+            {"_id": ObjectId(user_id)}, {"$set": {"is_active": True}}
+        )
+        return {"success": result.modified_count > 0, "message": "User unbanned"}
+
+    async def promote_user(self, user_id):
+        result = await self.db["users"].update_one(
+            {"_id": ObjectId(user_id)}, {"$set": {"role": "Admin"}}
+        )
+        return {"success": result.modified_count > 0, "message": "User promoted"}
+
+    async def get_revenue_trends(self):
+        # Placeholder data (replace with actual DB query)
+        return [
+            {"month": "Jun", "revenue": 15000},
+            {"month": "Jul", "revenue": 22000},
+            {"month": "Aug", "revenue": 27000},
+            {"month": "Sep", "revenue": 34000},
+            {"month": "Oct", "revenue": 42000},
+            {"month": "Nov", "revenue": 48000},
+        ]
+
+    async def get_top_tracked_products(self):
+        # Placeholder (you can compute from product collection)
+        return [
+            {"name": "MacBook Air M2", "scrapes": 1280},
+            {"name": "iPhone 15 Pro", "scrapes": 1040},
+            {"name": "Dell XPS 13", "scrapes": 860},
+        ]
+
+        
     # ==================== LEGACY METHODS (Updated) ====================
     
     async def store_amazon_product(self, product_data: Dict) -> str:

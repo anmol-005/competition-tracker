@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Laptop, UserPlus, LogIn } from "lucide-react";
+import { Laptop, UserPlus, LogIn, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -15,19 +16,28 @@ export default function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { toast } = useToast();
 
-  // Redirect authenticated users to home
+  // Redirect authenticated users to their respective dashboard
   useEffect(() => {
-    const isAuth = localStorage.getItem("isAuthenticated") === "true";
-    if (isAuth) {
+  // Only redirect if we are *not* already on /login and user is authenticated
+  const isAuth = localStorage.getItem("isAuthenticated") === "true";
+  const userData = JSON.parse(localStorage.getItem("user") || "{}");
+
+  if (isAuth && window.location.pathname === "/login") {
+    if (userData?.role?.toLowerCase() === "admin") {
+      setLocation("/admin");
+    } else {
       setLocation("/home");
     }
-  }, [setLocation]);
+  }
+}, [setLocation]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!identifier || !password) {
       toast({
         title: "Validation Error",
@@ -38,13 +48,10 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
-    
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier, password }),
         credentials: 'include',
       });
@@ -54,13 +61,18 @@ export default function LoginPage() {
       if (data.success) {
         localStorage.setItem("isAuthenticated", "true");
         localStorage.setItem("user", JSON.stringify(data.user));
-        
+
         toast({
-          title: "Welcome to LabXpert!",
-          description: `Login successful as ${data.user.role}`,
+          title: "Welcome Back!",
+          description: `Logged in as ${data.user.username || data.user.role}`,
         });
-        
-        setLocation("/home");
+
+        // 👇 Redirect based on role
+        if (data.user.role === "admin") {
+          setLocation("/admin");
+        } else {
+          setLocation("/home");
+        }
       } else {
         toast({
           title: "Login Failed",
@@ -68,7 +80,7 @@ export default function LoginPage() {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Login Error",
         description: "Unable to connect to server",
@@ -81,7 +93,7 @@ export default function LoginPage() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!identifier || !password || !confirmPassword) {
       toast({
         title: "Validation Error",
@@ -110,13 +122,10 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
-    
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier, password, confirmPassword }),
         credentials: 'include',
       });
@@ -128,8 +137,6 @@ export default function LoginPage() {
           title: "Registration Successful!",
           description: "Your account has been created. Please login.",
         });
-        
-        // Switch to login tab and clear signup form
         setActiveTab("login");
         setConfirmPassword("");
       } else {
@@ -139,7 +146,7 @@ export default function LoginPage() {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Registration Error",
         description: "Unable to connect to server",
@@ -167,7 +174,7 @@ export default function LoginPage() {
             </CardDescription>
           </div>
         </CardHeader>
-        
+
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
@@ -180,7 +187,8 @@ export default function LoginPage() {
                 Sign Up
               </TabsTrigger>
             </TabsList>
-            
+
+            {/* ---- LOGIN ---- */}
             <TabsContent value="login" className="space-y-4 mt-6">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
@@ -192,34 +200,34 @@ export default function LoginPage() {
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     disabled={isLoading}
-                    data-testid="input-identifier"
                   />
                 </div>
-                
-                <div className="space-y-2">
+
+                <div className="space-y-2 relative">
                   <Label htmlFor="login-password">Password</Label>
                   <Input
                     id="login-password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
-                    data-testid="input-password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-[38px] text-muted-foreground hover:text-foreground"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
-                
-                <Button
-                  type="submit"
-                  className="w-full"
-                  size="lg"
-                  disabled={isLoading}
-                  data-testid="button-login"
-                >
+
+                <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
                   {isLoading ? "Logging in..." : "Login"}
                 </Button>
               </form>
-              
+
               <div className="mt-4 p-3 bg-muted/50 rounded-lg">
                 <p className="text-sm text-muted-foreground font-medium mb-2">
                   Default Accounts:
@@ -231,7 +239,8 @@ export default function LoginPage() {
                 </div>
               </div>
             </TabsContent>
-            
+
+            {/* ---- SIGNUP ---- */}
             <TabsContent value="signup" className="space-y-4 mt-6">
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="space-y-2">
@@ -243,49 +252,56 @@ export default function LoginPage() {
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     disabled={isLoading}
-                    data-testid="input-signup-identifier"
                   />
                 </div>
-                
-                <div className="space-y-2">
+
+                <div className="space-y-2 relative">
                   <Label htmlFor="signup-password">Password</Label>
                   <Input
                     id="signup-password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
-                    data-testid="input-signup-password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-[38px] text-muted-foreground hover:text-foreground"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
-                
-                <div className="space-y-2">
+
+                <div className="space-y-2 relative">
                   <Label htmlFor="confirm-password">Confirm Password</Label>
                   <Input
                     id="confirm-password"
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     disabled={isLoading}
-                    data-testid="input-confirm-password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-[38px] text-muted-foreground hover:text-foreground"
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
-                
-                <Button
-                  type="submit"
-                  className="w-full"
-                  size="lg"
-                  disabled={isLoading}
-                  data-testid="button-signup"
-                >
+
+                <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
                   {isLoading ? "Creating Account..." : "Create Account"}
                 </Button>
               </form>
-              
+
               <p className="mt-4 text-center text-sm text-muted-foreground">
-                You can register with either a username or email address.<br/>
+                You can register with either a username or email address.<br />
                 New users are created with 'user' role by default.
               </p>
             </TabsContent>

@@ -3,6 +3,7 @@ MongoDB Database Manager for Competition Tracker
 Designed for real-time competitor intelligence and pricing analytics
 """
 
+import asyncio
 import motor.motor_asyncio
 import pymongo
 from datetime import datetime, timedelta

@@ -10,25 +10,40 @@ import LoginPage from "@/pages/login";
 import HomePage from "@/pages/home";
 import ProductsPage from "@/pages/products";
 import CartPage from "@/pages/cart";
+import AdminDashboard from "@/pages/AdminDashboard";
 import NotFound from "@/pages/not-found";
 
-function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
+// ✅ Enhanced Protected Route
+function ProtectedRoute({
+  component: Component,
+  role,
+}: {
+  component: () => JSX.Element;
+  role?: string;
+}) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [, setLocation] = useLocation();
 
   useEffect(() => {
     const auth = localStorage.getItem("isAuthenticated") === "true";
-    setIsAuthenticated(auth);
-    
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+
     if (!auth) {
+      setIsAuthenticated(false);
       setLocation("/login");
+      return;
     }
-  }, [setLocation]);
 
-  if (isAuthenticated === null) {
-    return null;
-  }
+    // ✅ Role-based restriction
+    if (role && user.role !== role) {
+      setLocation("/home");
+      return;
+    }
 
+    setIsAuthenticated(true);
+  }, [role, setLocation]);
+
+  if (isAuthenticated === null) return null;
   return isAuthenticated ? <Component /> : null;
 }
 
@@ -45,6 +60,9 @@ function Router() {
       <Route path="/cart">
         <ProtectedRoute component={CartPage} />
       </Route>
+      <Route path="/admin">
+        <ProtectedRoute component={AdminDashboard} role="admin" /> {/* ✅ */}
+      </Route>
       <Route path="/">
         <Redirect to="/login" />
       </Route>
@@ -56,7 +74,7 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light">
+      <ThemeProvider defaultTheme="dark">
         <CartProvider>
           <TooltipProvider>
             <Toaster />

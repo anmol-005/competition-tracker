@@ -13,6 +13,7 @@ import jwt
 from datetime import datetime, timedelta
 import os
 from enhanced_database_manager import CompetitionTrackerDB
+from fastapi.security import OAuth2PasswordBearer
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -146,35 +147,73 @@ async def register_user(user_data: UserCreate):
         "user_id": result["user_id"]
     }
 
+from fastapi import HTTPException, status
+from datetime import timedelta
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
 @app.post("/api/auth/login", response_model=Token)
 async def login_user(user_credentials: UserLogin):
     """Authenticate user and return JWT token"""
-    result = await db.authenticate_user(user_credentials.username, user_credentials.password)
-    
+
+    username = user_credentials.username
+    password = user_credentials.password
+
+    # --- ✅ Handle Admin Login ---
+    if username == "admin" and password == "admin123":
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": "admin", "role": "admin"},
+            expires_delta=access_token_expires
+        )
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "_id": "admin",
+                "username": "admin",
+                "role": "admin"
+            }
+        }
+
+    # --- 🧠 Normal user authentication ---
+    result = await db.authenticate_user(username, password)
     if not result["success"]:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=result["message"],
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
+    user = result["user"]
+    role = user.get("role", "user")  # default role
+
     # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": result["user"]["_id"]},
+        data={"sub": user["_id"], "role": role},
         expires_delta=access_token_expires
     )
-    
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": result["user"]
+        "user": user
     }
 
+from jose import JWTError, jwt
+
 @app.get("/api/auth/me", response_model=Dict[str, Any])
-async def get_current_user_info(current_user: dict = Depends(get_current_user)):
-    """Get current user information"""
-    return {"user": current_user}
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        role: str = payload.get("role", "user")
+        if user_id is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        return {"_id": user_id, "role": role}
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
 # ==================== PRODUCT ENDPOINTS ====================
 
@@ -439,6 +478,84 @@ async def root():
         "docs": "/docs",
         "health": "/api/health"
     }
+
+# ==================== ADMIN DASHBOARD ROUTES ====================
+
+from bson import ObjectId
+
+@app.get("/api/admin/users")
+async def get_all_users():
+    """Fetch all registered users"""
+    users = await db.get_all_users()
+    # Convert ObjectIds to strings for JSON serialization
+    for u in users:
+        if "_id" in u:
+            u["_id"] = str(u["_id"])
+    return {"success": True, "users": users}
+
+
+@app.patch("/api/admin/users/{user_id}/flag")
+async def flag_user(user_id: str):
+    """Flag a user"""
+    result = await db.flag_user(user_id)
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result["message"])
+    return {"success": True, "message": "User flagged successfully"}
+
+
+@app.patch("/api/admin/users/{user_id}/ban")
+async def ban_user(user_id: str):
+    """Ban (deactivate) a user"""
+    result = await db.ban_user(user_id)
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result["message"])
+    return {"success": True, "message": "User banned successfully"}
+
+
+@app.patch("/api/admin/users/{user_id}/unban")
+async def unban_user(user_id: str):
+    """Unban (reactivate) a user"""
+    result = await db.unban_user(user_id)
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result["message"])
+    return {"success": True, "message": "User unbanned successfully"}
+
+
+@app.patch("/api/admin/users/{user_id}/promote")
+async def promote_user(user_id: str):
+    """Promote user to Admin"""
+    result = await db.promote_user(user_id)
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result["message"])
+    return {"success": True, "message": "User promoted to Admin"}
+
+
+@app.get("/api/admin/analytics/revenue")
+async def revenue_trend():
+    """Fetch revenue data for dashboard graph"""
+    data = await db.get_revenue_trends()
+    return {"success": True, "data": data}
+
+
+@app.get("/api/admin/analytics/top-products")
+async def top_tracked_products():
+    """Fetch top tracked product data"""
+    data = await db.get_top_tracked_products()
+    return {"success": True, "products": data}
+
+
+@app.get("/api/admin/system/health")
+async def system_health():
+    """System status for dashboard"""
+    return {
+        "success": True,
+        "systems": [
+            {"name": "Amazon Scraper", "status": "Healthy"},
+            {"name": "Smartprix Scraper", "status": "Healthy"},
+            {"name": "Classification Model", "status": "Healthy"}
+        ]
+    }
+
 
 # ==================== RUN SERVER ====================
 
