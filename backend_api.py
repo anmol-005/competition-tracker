@@ -479,82 +479,121 @@ async def root():
         "health": "/api/health"
     }
 
-# ==================== ADMIN DASHBOARD ROUTES ====================
+# Add these imports near the top of backend_api.py (if not already present)
+from fastapi import Path
+import traceback
+from typing import Any, Dict
 
-from bson import ObjectId
+# Add this route near your product endpoints (e.g. after get_product_details_for_frontend)
+@app.post("/api/predict/{product_id}", response_model=Dict[str, Any])
+async def predict_price_for_product(
+    product_id: str = Path(..., description="Database _id of the product"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Run ML + LLM price prediction for a single product.
+    - Returns structured JSON with predicted_price, decision, rationale, and metadata.
+    - Uses the PricePredictionLLM in llm.py if available; falls back to a heuristic.
+    """
+    # 1) Load product details from DB (frontend helper)
+    result = await db.get_product_details_for_frontend(product_id)
+    if "error" in result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
-@app.get("/api/admin/users")
-async def get_all_users():
-    """Fetch all registered users"""
-    users = await db.get_all_users()
-    # Convert ObjectIds to strings for JSON serialization
-    for u in users:
-        if "_id" in u:
-            u["_id"] = str(u["_id"])
-    return {"success": True, "users": users}
+    product = result  # formatted for frontend by enhanced_database_manager.get_product_details_for_frontend
+    # product keys: id, product_id, name, brand, platforms, pricing_summary, etc. :contentReference[oaicite:3]{index=3}
 
-
-@app.patch("/api/admin/users/{user_id}/flag")
-async def flag_user(user_id: str):
-    """Flag a user"""
-    result = await db.flag_user(user_id)
-    if not result["success"]:
-        raise HTTPException(status_code=404, detail=result["message"])
-    return {"success": True, "message": "User flagged successfully"}
-
-
-@app.patch("/api/admin/users/{user_id}/ban")
-async def ban_user(user_id: str):
-    """Ban (deactivate) a user"""
-    result = await db.ban_user(user_id)
-    if not result["success"]:
-        raise HTTPException(status_code=404, detail=result["message"])
-    return {"success": True, "message": "User banned successfully"}
-
-
-@app.patch("/api/admin/users/{user_id}/unban")
-async def unban_user(user_id: str):
-    """Unban (reactivate) a user"""
-    result = await db.unban_user(user_id)
-    if not result["success"]:
-        raise HTTPException(status_code=404, detail=result["message"])
-    return {"success": True, "message": "User unbanned successfully"}
-
-
-@app.patch("/api/admin/users/{user_id}/promote")
-async def promote_user(user_id: str):
-    """Promote user to Admin"""
-    result = await db.promote_user(user_id)
-    if not result["success"]:
-        raise HTTPException(status_code=404, detail=result["message"])
-    return {"success": True, "message": "User promoted to Admin"}
-
-
-@app.get("/api/admin/analytics/revenue")
-async def revenue_trend():
-    """Fetch revenue data for dashboard graph"""
-    data = await db.get_revenue_trends()
-    return {"success": True, "data": data}
-
-
-@app.get("/api/admin/analytics/top-products")
-async def top_tracked_products():
-    """Fetch top tracked product data"""
-    data = await db.get_top_tracked_products()
-    return {"success": True, "products": data}
-
-
-@app.get("/api/admin/system/health")
-async def system_health():
-    """System status for dashboard"""
-    return {
-        "success": True,
-        "systems": [
-            {"name": "Amazon Scraper", "status": "Healthy"},
-            {"name": "Smartprix Scraper", "status": "Healthy"},
-            {"name": "Classification Model", "status": "Healthy"}
-        ]
+    # Prepare a safe payload to return
+    response_payload: Dict[str, Any] = {
+        "product_id": product.get("id"),
+        "name": product.get("name"),
+        "timestamp": datetime.utcnow().isoformat(),
+        "source": "heuristic",
+        "predicted_price": None,
+        "decision": None,
+        "llm_rationale": None,
+        "ml_details": None,
     }
+
+    try:
+        # 2) Try to import and run your LLM wrapper
+        # PricePredictionLLM is defined in llm.py (see llm.py file). :contentReference[oaicite:4]{index=4}
+        from llm import PricePredictionLLM
+
+        llm = PricePredictionLLM()
+        # If your LL M requires DB connect, it has connect_to_database() — handle if needed
+        try:
+            # try to initialize/connect if method exists
+            if hasattr(llm, "connect_to_database"):
+                await llm.connect_to_database()
+        except Exception:
+            # non-fatal - continue if connection is unnecessary
+            pass
+
+        # The llm class in your repo calls generate_price_prediction(product) in examples.
+        if hasattr(llm, "generate_price_prediction"):
+            # make sure we pass a minimal product payload expected by the LLM
+            llm_input = {
+                "name": product.get("name"),
+                "platforms": product.get("platforms", {}),
+                "pricing_summary": product.get("pricing_summary", {})
+            }
+            # call it and expect an awaitable result
+            ml_result = await llm.generate_price_prediction(llm_input)
+            # Normalize result into response_payload
+            response_payload.update({
+                "source": "llm",
+                "predicted_price": ml_result.get("predicted_price") if isinstance(ml_result, dict) else ml_result,
+                "decision": ml_result.get("decision") if isinstance(ml_result, dict) else None,
+                "llm_rationale": ml_result.get("llm_rationale") if isinstance(ml_result, dict) else str(ml_result),
+                "ml_details": ml_result
+            })
+            return {"success": True, "prediction": response_payload}
+        else:
+            # No generate_price_prediction method — fall through to heuristic
+            raise RuntimeError("LLM class exists but no 'generate_price_prediction' method found")
+
+    except Exception as e:
+        # If LLM fails, do a quick heuristic fallback so the frontend always gets something useful
+        tb = traceback.format_exc()
+        # quick heuristic: predicted = round(0.98 * competitor_avg) or current price if no competitor data
+        try:
+            # collect competitor numeric prices from platforms
+            platform_prices = []
+            for p_name, p in (product.get("platforms") or {}).items():
+                price = p.get("price") or p.get("current_price") or None
+                if isinstance(price, (int, float)):
+                    platform_prices.append(float(price))
+            competitor_avg = (sum(platform_prices) / len(platform_prices)) if platform_prices else None
+
+            our_price = product.get("pricing_summary", {}).get("lowest_price")
+            if competitor_avg:
+                predicted = round(competitor_avg * 0.98)
+            elif our_price:
+                predicted = our_price
+            else:
+                predicted = None
+
+            decision = None
+            if predicted and our_price:
+                decision = "price_cut" if predicted < our_price else "hold"
+
+            llm_rationale = (
+                f"Fallback heuristic used. Competitor average: "
+                f"₹{competitor_avg:.2f}." if competitor_avg else "Fallback heuristic used: insufficient competitor data."
+            )
+
+            response_payload.update({
+                "source": "heuristic",
+                "predicted_price": predicted,
+                "decision": decision,
+                "llm_rationale": llm_rationale,
+                "ml_details": {"error": str(e), "traceback": tb}
+            })
+            return {"success": True, "prediction": response_payload, "warning": "LLM failed, used heuristic fallback."}
+        except Exception as e2:
+            # final fallback error
+            return {"success": False, "error": "Prediction failed", "details": str(e2), "traceback": tb}
 
 
 # ==================== RUN SERVER ====================

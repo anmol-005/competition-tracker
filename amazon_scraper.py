@@ -7,9 +7,6 @@ from crawl4ai import AsyncWebCrawler
 from crawl4ai.async_configs import BrowserConfig, CrawlerRunConfig
 from crawl4ai.extraction_strategy import JsonCssExtractionStrategy
 
-# Import database utilities
-from scraper_db_utils import db_manager
-
 async def scrape_amazon(product_name: str, max_items: int = 10, retries: int = 3):
     print(f"🕵️  Deploying Digital Spy for: '{product_name}' on Amazon.in...")
     search_url = f"https://www.amazon.in/s?k={quote(product_name)}"
@@ -20,14 +17,13 @@ async def scrape_amazon(product_name: str, max_items: int = 10, retries: int = 3
         "name": "AmazonIntelligence",
         "baseSelector": "div.s-main-slot div[data-component-type='s-search-result']",
         "fields": [
-            {"name": "title", "selector": "h2 a span, h2 span", "type": "text"},
+            {"name": "title", "selector": "a h2 span", "type": "text"},
             {"name": "price_whole", "selector": "span.a-price-whole", "type": "text"},
             {"name": "price_fraction", "selector": "span.a-price-fraction", "type": "text"},
             {"name": "list_price", "selector": "span.a-price.a-text-price span.a-offscreen", "type": "text"},
-            {"name": "rating", "selector": "span.a-icon-alt, i.a-icon-star span.a-icon-alt", "type": "text"},
-            {"name": "reviews", "selector": "span.a-size-base.s-underline-text, a.a-link-normal span.a-size-base", "type": "text"},
-            {"name": "link", "selector": "h2 a, a.a-link-normal.s-no-outline", "type": "attribute", "attribute": "href"},
-            {"name": "image", "selector": "img.s-image", "type": "attribute", "attribute": "src"}
+            {"name": "rating", "selector": "span.a-icon-alt", "type": "text"},
+            {"name": "reviews", "selector": "span.a-size-base.s-underline-text", "type": "text"},
+            {"name": "link", "selector": "a.a-link-normal.s-no-outline", "type": "attribute", "attribute": "href"}
         ]
     }
 
@@ -64,17 +60,13 @@ async def scrape_amazon(product_name: str, max_items: int = 10, retries: int = 3
     print("\n📝 Cleaning and compiling the intelligence report...")
     
     # ⭐ FINAL UPDATE: Brand-aware filtering logic
-    # Clean the product name by removing quotes and extra spaces
-    clean_product_name = product_name.strip().strip('"').strip("'")
-    all_keywords = [word.lower() for word in clean_product_name.split()]
+    all_keywords = [word.lower() for word in product_name.split()]
     
-    # For products like "iPhone 15", we want to check for both "iphone" and "15"
-    # The first word is assumed to be the brand (iPhone, MacBook, etc.)
-    # The rest are model identifiers that should be present
-    brand_keyword = all_keywords[0] if all_keywords else ""
-    other_core_keywords = all_keywords[1:] if len(all_keywords) > 1 else []
+    # The first word is assumed to be the brand and might be missing from the title.
+    # The rest of the non-numeric words are the *true* core keywords.
+    other_core_keywords = [k for k in all_keywords[1:] if not k.isnumeric()]
     
-    print(f"  -> Rule 1: Title must contain brand '{brand_keyword}' and keywords: {other_core_keywords}")
+    print(f"  -> Rule 1: Title must contain these keywords: {other_core_keywords}")
 
     EXCLUSION_KEYWORDS = [
         'protector', 'glass', 'case', 'cover', 'charger', 'cable', 
@@ -90,14 +82,9 @@ async def scrape_amazon(product_name: str, max_items: int = 10, retries: int = 3
         
         title_lower = title.lower()
 
-        # Rule 1: Check if brand and core keywords are in the title
-        if brand_keyword and brand_keyword not in title_lower:
-            print(f"  -> FILTERED OUT: '{title[:60]}...' (Missing brand keyword: {brand_keyword})")
-            continue
-            
-        if other_core_keywords and not all(keyword in title_lower for keyword in other_core_keywords):
-            missing_keywords = [k for k in other_core_keywords if k not in title_lower]
-            print(f"  -> FILTERED OUT: '{title[:60]}...' (Missing keywords: {missing_keywords})")
+        # Rule 1: Check if ALL *other* core keywords are in the title
+        if not all(keyword in title_lower for keyword in other_core_keywords):
+            print(f"  -> FILTERED OUT: '{title[:60]}...' (Missing a core keyword)")
             continue
 
         # Rule 2: Check if any accessory keywords are in the title
@@ -129,34 +116,12 @@ async def scrape_amazon(product_name: str, max_items: int = 10, retries: int = 3
     print("  -> ✅ Report compiled with relevant items.")
     return cleaned_report
 
-async def save_report_to_database(report_data: list, search_query: str, filename="competitor_intelligence_db.json"):
-    """
-    Save report to both MongoDB and JSON file (backup)
-    """
+def save_report_to_database(report_data: list, filename="competitor_intelligence_db.json"):
     if not report_data:
         print("  -> No data to save.")
-        return False
+        return
         
-    print(f"\n💾 Saving report to MongoDB database...")
-    
-    # Connect to database and store data
-    success = False
-    try:
-        if await db_manager.connect():
-            success = await db_manager.store_amazon_scraping_data(report_data, search_query)
-            await db_manager.close()
-            
-            if success:
-                print(f"  -> ✅ Report successfully saved to MongoDB database.")
-            else:
-                print(f"  -> ⚠️ Failed to save to MongoDB, saving to JSON backup instead.")
-        else:
-            print(f"  -> ⚠️ Database connection failed, saving to JSON backup instead.")
-    except Exception as e:
-        print(f"  -> ⚠️ Database error: {e}. Saving to JSON backup instead.")
-    
-    # Always save to JSON as backup
-    print(f"\n💾 Saving backup to JSON file ('{filename}')...")
+    print(f"\n💾 Saving report to our intelligence database ('{filename}')...")
     database = []
     if os.path.exists(filename):
         with open(filename, 'r', encoding='utf-8') as f:
@@ -170,15 +135,13 @@ async def save_report_to_database(report_data: list, search_query: str, filename
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(database, f, indent=4, ensure_ascii=False)
             
-    print(f"  -> ✅ JSON backup saved successfully.")
-    return True
+    print(f"  -> ✅ Report successfully saved.")
 
 
-async def main():
-    """Main function to run Amazon scraper with database integration"""
+if __name__ == "__main__":
     try:
         query = input("Enter Product Name to spy on: ")
-        results = await scrape_amazon(query)
+        results = asyncio.run(scrape_amazon(query))
 
         if results:
             print("\n--- 🕵️ SPY REPORT ---")
@@ -192,13 +155,10 @@ async def main():
                 print(f"  Reviews: {p['review_count']}")
                 print(f"  Link: {p['product_link']}")
             
-            await save_report_to_database(results, query)
+            save_report_to_database(results)
 
         else:
             print("\n--- End of Report: No relevant items found or spy was blocked. ---")
 
     except KeyboardInterrupt:
         print("\n\n-- Operation aborted by user. --")
-
-if __name__ == "__main__":
-    asyncio.run(main())
