@@ -82,6 +82,30 @@ export default function AdminDashboard() {
       <>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard Overview</h1>
 
+        <Button
+          onClick={async () => {
+            try {
+              const res = await fetch("http://localhost:8000/send-alert");
+              const data = await res.json();
+              if (data.success) {
+                alert("✅ Email sent successfully!");
+              } else {
+                alert("❌ Failed to send email: " + data.error);
+              }
+            } catch (err) {
+                if (err instanceof Error) {
+                  alert("❌ Error connecting to backend: " + err.message);
+                } else {
+                  alert("❌ Unexpected error occurred");
+                }
+              }
+          }}
+          className="bg-blue-600 hover:bg-blue-700 text-white mt-4"
+        >
+          📧 Send Price Drop Alert
+        </Button>
+
+
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <Card className="bg-[#18181b] border-gray-800">

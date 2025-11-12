@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import os
 from enhanced_database_manager import CompetitionTrackerDB
 from fastapi.security import OAuth2PasswordBearer
+from mail import send_price_alert
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -263,6 +264,15 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
         )
     
     return result
+
+@app.get("/send-alert")
+def trigger_price_alert():
+    """Endpoint that triggers sending the email."""
+    try:
+        send_price_alert()
+        return {"success": True, "message": "Email sent successfully!"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 # ==================== SCRAPING ENDPOINTS ====================
 
