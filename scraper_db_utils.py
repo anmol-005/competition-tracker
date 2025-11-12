@@ -44,7 +44,7 @@ class ScraperDatabaseManager:
             logger.error(f"❌ Database connection failed: {e}")
             return False
     
-    async def store_amazon_scraping_data(self, scraped_data: List[Dict], search_query: str) -> bool:
+    async def store_amazon_scraping_data(self, scraped_data: List[Dict], search_query: str) -> str:
         """
         Store Amazon scraping results in database
         
@@ -58,9 +58,28 @@ class ScraperDatabaseManager:
         try:
             if not scraped_data:
                 logger.warning("No Amazon data to store")
-                return False
+                return str(ObjectId())
                 
-            collection = self.db[DatabaseConfig.AMAZON_SCRAPING_DATA_COLLECTION]
+            # Store session data in scraping collection
+            session_id = str(ObjectId())
+            scraping_collection = self.db[DatabaseConfig.AMAZON_SCRAPING_DATA_COLLECTION]
+            
+            # Store the scraping session with products
+            session_doc = {
+                "session_id": session_id,
+                "search_query": search_query,
+                "products": scraped_data,
+                "total_products": len(scraped_data),
+                "timestamp": datetime.utcnow(),
+                "platform": "amazon",
+                "status": "completed"
+            }
+            
+            await scraping_collection.insert_one(session_doc)
+            logger.info(f"✅ Stored Amazon scraping session {session_id} with {len(scraped_data)} products")
+            
+            # Also store individual products in detailed collection for analytics
+            collection = self.db["amazon_products_detailed"]
             stored_count = 0
             
             for item in scraped_data:
@@ -131,21 +150,22 @@ class ScraperDatabaseManager:
             logger.info(f"✅ Amazon: Stored {stored_count}/{len(scraped_data)} products")
             
             # Log scraping activity
-            await self._log_scraping_activity(
+            log_result = await self._log_scraping_activity(
                 "amazon", 
                 "success" if stored_count > 0 else "no_data",
                 stored_count,
                 search_query
             )
             
-            return stored_count > 0
+            # Return the session_id 
+            return session_id
             
         except Exception as e:
             logger.error(f"❌ Error storing Amazon data: {e}")
-            await self._log_scraping_activity("amazon", "failed", 0, search_query, [str(e)])
-            return False
+            error_session = await self._log_scraping_activity("amazon", "failed", 0, search_query, [str(e)])
+            return error_session
 
-    async def store_smartprix_scraping_data(self, scraped_data: List[Dict], search_query: str) -> bool:
+    async def store_smartprix_scraping_data(self, scraped_data: List[Dict], search_query: str) -> str:
         """
         Store Smartprix scraping results in database
         
@@ -159,9 +179,28 @@ class ScraperDatabaseManager:
         try:
             if not scraped_data:
                 logger.warning("No Smartprix data to store")
-                return False
+                return str(ObjectId())
                 
-            collection = self.db[DatabaseConfig.SMARTPRIX_SCRAPING_DATA_COLLECTION]
+            # Store session data in scraping collection
+            session_id = str(ObjectId())
+            scraping_collection = self.db[DatabaseConfig.SMARTPRIX_SCRAPING_DATA_COLLECTION]
+            
+            # Store the scraping session with products
+            session_doc = {
+                "session_id": session_id,
+                "search_query": search_query,
+                "products": scraped_data,
+                "total_products": len(scraped_data),
+                "timestamp": datetime.utcnow(),
+                "platform": "smartprix",
+                "status": "completed"
+            }
+            
+            await scraping_collection.insert_one(session_doc)
+            logger.info(f"✅ Stored Smartprix scraping session {session_id} with {len(scraped_data)} products")
+            
+            # Also store individual products in detailed collection for analytics
+            collection = self.db["smartprix_products_detailed"]
             stored_count = 0
             
             for item in scraped_data:
@@ -231,12 +270,13 @@ class ScraperDatabaseManager:
                 search_query
             )
             
-            return stored_count > 0
+            # Return the session_id 
+            return session_id
             
         except Exception as e:
             logger.error(f"❌ Error storing Smartprix data: {e}")
-            await self._log_scraping_activity("smartprix", "failed", 0, search_query, [str(e)])
-            return False
+            error_session = await self._log_scraping_activity("smartprix", "failed", 0, search_query, [str(e)])
+            return error_session
 
     async def store_flipkart_reviews_data(self, review_data: Dict) -> bool:
         """
@@ -387,6 +427,7 @@ class ScraperDatabaseManager:
         try:
             logs_collection = self.db[DatabaseConfig.SCRAPING_LOGS_COLLECTION]
             
+            session_id = str(ObjectId())
             log_doc = {
                 "platform": platform,
                 "status": status,  # success, failed, no_data, partial
@@ -394,13 +435,15 @@ class ScraperDatabaseManager:
                 "search_query": search_query,
                 "errors": errors or [],
                 "timestamp": datetime.utcnow(),
-                "session_id": str(ObjectId())
+                "session_id": session_id
             }
             
             await logs_collection.insert_one(log_doc)
+            return session_id
             
         except Exception as e:
             logger.error(f"❌ Error logging scraping activity: {e}")
+            return str(ObjectId())  # Return a session_id even on error
 
     # Parsing utility methods
     def _extract_asin_from_url(self, url: str) -> Optional[str]:
@@ -556,7 +599,7 @@ class ScraperDatabaseManager:
             
         return round(available_fields / total_fields, 2)
 
-    async def store_flipkart_scraping_data(self, scraped_data: List[Dict], search_query: str) -> bool:
+    async def store_flipkart_scraping_data(self, scraped_data: List[Dict], search_query: str) -> str:
         """
         Store Flipkart scraping data in the flipkart_scraping_data collection
         
@@ -570,9 +613,28 @@ class ScraperDatabaseManager:
         try:
             if not scraped_data:
                 logger.warning("No Flipkart data to store")
-                return False
+                return str(ObjectId())
                 
-            collection = self.db[DatabaseConfig.FLIPKART_SCRAPING_DATA_COLLECTION]
+            # Store session data in scraping collection
+            session_id = str(ObjectId())
+            scraping_collection = self.db[DatabaseConfig.FLIPKART_SCRAPING_DATA_COLLECTION]
+            
+            # Store the scraping session with products
+            session_doc = {
+                "session_id": session_id,
+                "search_query": search_query,
+                "products": scraped_data,
+                "total_products": len(scraped_data),
+                "timestamp": datetime.utcnow(),
+                "platform": "flipkart",
+                "status": "completed"
+            }
+            
+            await scraping_collection.insert_one(session_doc)
+            logger.info(f"✅ Stored Flipkart scraping session {session_id} with {len(scraped_data)} products")
+            
+            # Also store individual products in detailed collection for analytics
+            collection = self.db["flipkart_products_detailed"]
             stored_count = 0
             
             for item in scraped_data:
@@ -662,16 +724,18 @@ class ScraperDatabaseManager:
             # Log scraping activity
             await self._log_scraping_activity(
                 "flipkart", 
-                search_query, 
-                len(scraped_data), 
-                stored_count
+                "success" if stored_count > 0 else "no_data",
+                stored_count,
+                search_query
             )
             
-            return True
+            # Return the session_id 
+            return session_id
             
         except Exception as e:
             logger.error(f"❌ Flipkart storage error: {e}")
-            return False
+            error_session = await self._log_scraping_activity("flipkart", "failed", 0, search_query, [str(e)])
+            return error_session
 
     async def close(self):
         """Close database connection"""

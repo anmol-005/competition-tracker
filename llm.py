@@ -205,8 +205,8 @@ class PricePredictionLLM:
                     flipkart_found = True
                     break  # Only take first match from each platform
             
-            # Include if found on 2 or more platforms (tight matching)
-            if len(current_match['platforms']) >= 2:
+            # ✅ RELAXED: Include if found on 1 or more platforms (was 2+)
+            if len(current_match['platforms']) >= 1:
                 # Calculate price statistics
                 prices = [p['price'] for p in current_match['platforms']]
                 current_match['min_price'] = min(prices)
@@ -232,18 +232,34 @@ class PricePredictionLLM:
                     current_match['platforms'].append(flipkart_product)
                     break  # Only take first match
             
-            # Only include if found on multiple platforms
-            if len(current_match['platforms']) >= 2:
+            # ✅ RELAXED: Include single-platform products to increase data availability
+            if len(current_match['platforms']) >= 1:
                 # Calculate price statistics
                 prices = [p['price'] for p in current_match['platforms']]
                 current_match['min_price'] = min(prices)
                 current_match['max_price'] = max(prices)
-                current_match['price_range'] = max(prices) - min(prices)
+                current_match['price_range'] = max(prices) - min(prices) if len(prices) > 1 else 0
                 current_match['avg_price'] = sum(prices) / len(prices)
                 current_match['platform_count'] = len(current_match['platforms'])
                 
                 similar_products.append(current_match)
                 processed_matches.add(smartprix_name)
+        
+        # ✅ NEW: Also add single-platform products from Flipkart that weren't matched
+        for flipkart_product in platforms_data['flipkart']:
+            flipkart_name = flipkart_product['name'].lower()
+            if flipkart_name not in processed_matches:
+                current_match = {
+                    'platforms': [flipkart_product], 
+                    'name': flipkart_product['name'],
+                    'min_price': flipkart_product['price'],
+                    'max_price': flipkart_product['price'],
+                    'price_range': 0,
+                    'avg_price': flipkart_product['price'],
+                    'platform_count': 1
+                }
+                similar_products.append(current_match)
+                processed_matches.add(flipkart_name)
         
         # Sort products: 3-platform products first, then by price range (more interesting products first)
         similar_products.sort(key=lambda x: (-x['platform_count'], -x['price_range']))
@@ -251,7 +267,7 @@ class PricePredictionLLM:
         return similar_products
     
     def is_similar_product(self, name1: str, name2: str) -> bool:
-        """Check if two product names represent the EXACT same product with identical specifications"""
+        """Check if two product names represent similar products with flexible matching criteria"""
         name1_lower = name1.lower()
         name2_lower = name2.lower()
         
@@ -259,35 +275,100 @@ class PricePredictionLLM:
         specs1 = self.extract_product_specs(name1_lower)
         specs2 = self.extract_product_specs(name2_lower)
         
-        # Both products must have at least brand and model
-        if not specs1['brand'] or not specs1['model']:
-            return False
+        # ✅ RELAXED MATCHING: Multiple matching strategies
+        
+        # Strategy 1: Direct text similarity (for cases where specs extraction fails)
+        if self._fuzzy_name_match(name1_lower, name2_lower):
+            return True
+        
+        # Strategy 2: Brand and model matching (relaxed storage/RAM requirements)
+        if specs1['brand'] and specs2['brand'] and specs1['model'] and specs2['model']:
+            # Core match: same brand and model
+            core_match = (
+                specs1['brand'] == specs2['brand'] and
+                specs1['model'] == specs2['model']
+            )
             
-        if not specs2['brand'] or not specs2['model']:
-            return False
+            if core_match:
+                # ✅ RELAXED: Storage matching is now optional
+                storage_compatible = True
+                if specs1['storage'] and specs2['storage']:
+                    # Both have storage: must match
+                    storage_compatible = specs1['storage'] == specs2['storage']
+                # If only one has storage info, still consider compatible
+                
+                # ✅ RELAXED: RAM matching is now optional for laptops
+                ram_compatible = True
+                if (specs1['category'] == 'laptop' and specs2['category'] == 'laptop'):
+                    if specs1['ram'] and specs2['ram']:
+                        # Both have RAM: must match
+                        ram_compatible = specs1['ram'] == specs2['ram']
+                    # If only one has RAM info, still consider compatible
+                
+                return storage_compatible and ram_compatible
         
-        # Core specifications must match
-        specs_match = (
-            specs1['brand'] == specs2['brand'] and
-            specs1['model'] == specs2['model']
-        )
+        # Strategy 3: Fallback brand-only matching for similar product families
+        if specs1['brand'] and specs2['brand'] and specs1['brand'] == specs2['brand']:
+            # Same brand: check if product names are very similar
+            return self._brand_family_match(name1_lower, name2_lower, specs1['brand'])
         
-        # For storage: if either has storage info, both must have AND match (strict)
-        if specs1['storage'] or specs2['storage']:
-            if not specs1['storage'] or not specs2['storage']:
-                return False
-            if specs1['storage'] != specs2['storage']:
-                return False
+        return False
+    
+    def _fuzzy_name_match(self, name1: str, name2: str) -> bool:
+        """Check if product names are very similar using fuzzy matching"""
+        # Remove common words that don't affect product identity
+        stopwords = ['with', 'and', 'or', 'the', 'smartphone', 'mobile', 'phone', 'laptop', 'computer', 'pc']
         
-        # For laptops, RAM is STRICT: if either has RAM, both must have and match
-        if specs1['category'] == 'laptop' and specs2['category'] == 'laptop':
-            if specs1['ram'] or specs2['ram']:
-                if not specs1['ram'] or not specs2['ram']:
-                    return False
-                if specs1['ram'] != specs2['ram']:
-                    return False
+        def clean_name(name):
+            words = name.split()
+            return ' '.join([w for w in words if w not in stopwords])
         
-        return specs_match
+        clean1 = clean_name(name1)
+        clean2 = clean_name(name2)
+        
+        # Calculate similarity ratio
+        import difflib
+        similarity = difflib.SequenceMatcher(None, clean1, clean2).ratio()
+        
+        # ✅ RELAXED: Consider 75% similarity as match (was 100% exact match)
+        return similarity >= 0.75
+    
+    def _brand_family_match(self, name1: str, name2: str, brand: str) -> bool:
+        """Check if products from same brand are similar enough"""
+        # For same brand, check if they share key model identifiers
+        if brand in ['apple', 'samsung', 'oneplus', 'xiaomi', 'google']:
+            # Extract model numbers/names
+            import re
+            
+            # Look for model numbers or identifiers
+            model_patterns = [
+                r'\b(\d+)\b',  # Numbers like 15, 14, 13
+                r'\b(pro|plus|mini|ultra|max|air)\b',  # Variants
+                r'\b([a-z]\d+)\b',  # Like S24, A54
+            ]
+            
+            models1 = set()
+            models2 = set()
+            
+            for pattern in model_patterns:
+                models1.update(re.findall(pattern, name1))
+                models2.update(re.findall(pattern, name2))
+            
+            # If they share any model identifiers, consider them similar
+            return bool(models1.intersection(models2))
+        
+        # For other brands, use word overlap
+        words1 = set(name1.split())
+        words2 = set(name2.split())
+        overlap = words1.intersection(words2)
+        
+        # ✅ RELAXED: 40% word overlap indicates similar products
+        min_words = min(len(words1), len(words2))
+        if min_words > 0:
+            overlap_ratio = len(overlap) / min_words
+            return overlap_ratio >= 0.4
+        
+        return False
     
     def extract_product_specs(self, product_name: str) -> dict:
         """Extract comprehensive product specifications for exact matching"""
@@ -467,7 +548,36 @@ class PricePredictionLLM:
         
         return ""
     
-    async def generate_price_prediction(self, product_data: Dict) -> str:
+    def _extract_price_from_ai_response(self, ai_text: str, product_data: Dict) -> int:
+        """Extract recommended price from AI response text"""
+        import re
+        
+        # Look for price patterns in the AI response
+        price_patterns = [
+            r'₹([\d,]+)',  # ₹1,23,456
+            r'Rs\.?\s*([\d,]+)',  # Rs. 123456 or Rs 123456
+            r'rupees?\s*([\d,]+)',  # rupees 123456
+            r'price.*?(\d[\d,]+)',  # price: 123456
+            r'recommend.*?(\d[\d,]+)',  # recommend 123456
+        ]
+        
+        for pattern in price_patterns:
+            matches = re.findall(pattern, ai_text, re.IGNORECASE)
+            for match in matches:
+                try:
+                    # Clean and convert to int
+                    price_str = match.replace(',', '')
+                    price = int(float(price_str))
+                    # Validate price is reasonable
+                    if 100 <= price <= 10000000:  # Between ₹100 and ₹1 crore
+                        return price
+                except (ValueError, TypeError):
+                    continue
+        
+        # If no valid price found in AI text, use fallback
+        return int(product_data['min_price'] * 0.95)
+    
+    async def generate_price_prediction(self, product_data: Dict) -> Dict[str, Any]:
         """Generate price prediction using Google AI"""
         platforms = product_data['platforms']
         product_name = product_data['name']
@@ -477,17 +587,19 @@ class PricePredictionLLM:
         
         # Fallback manual analysis if AI model is not available
         if not self.model:
-            return f"""⚠️ AI Model Not Available - Manual Price Analysis:
-            
-Product: {product_name}
-- Current Price Range: ₹{product_data['min_price']:,.0f} - ₹{product_data['max_price']:,.0f}
-- Average Market Price: ₹{product_data['avg_price']:,.0f}
-- Estimated Cost (70% of lowest): ₹{estimated_cost:,.0f}
-
-💡 Recommended Competitive Price: ₹{int(product_data['min_price'] * 0.95):,.0f}
-   (5% below lowest competitor while maintaining healthy margins)
-   
-✅ This ensures profitability while remaining competitive across all 3 platforms."""
+            recommended_price = int(product_data['min_price'] * 0.95)
+            return {
+                "predicted_price": recommended_price,
+                "decision": "price_cut" if recommended_price < product_data['avg_price'] else "hold",
+                "llm_rationale": f"⚠️ AI Model Not Available - Manual Analysis: Recommended ₹{recommended_price:,} (5% below lowest competitor ₹{product_data['min_price']:,} while maintaining healthy margins above estimated cost ₹{estimated_cost:,.0f})",
+                "source": "manual_fallback",
+                "product_name": product_name,
+                "price_range": {
+                    "min": product_data['min_price'],
+                    "max": product_data['max_price'],
+                    "avg": product_data['avg_price']
+                }
+            }
         
         try:
             
@@ -530,7 +642,22 @@ Product: {product_name}
             try:
                 response = self.model.generate_content(prompt)
                 if response and response.text:
-                    return f"🤖 AI Price Recommendation:\n{response.text}"
+                    # Parse AI response to extract recommended price
+                    ai_text = response.text
+                    recommended_price = self._extract_price_from_ai_response(ai_text, product_data)
+                    
+                    return {
+                        "predicted_price": recommended_price,
+                        "decision": "price_cut" if recommended_price < product_data['avg_price'] else "hold",
+                        "llm_rationale": f"🤖 AI Recommendation: {ai_text[:200]}..." if len(ai_text) > 200 else f"🤖 AI Recommendation: {ai_text}",
+                        "source": "google_ai",
+                        "product_name": product_name,
+                        "price_range": {
+                            "min": product_data['min_price'],
+                            "max": product_data['max_price'], 
+                            "avg": product_data['avg_price']
+                        }
+                    }
                 else:
                     # Handle empty response - fallback to manual analysis
                     pass
@@ -543,28 +670,44 @@ Product: {product_name}
                     try:
                         response = self.model.generate_content(prompt)
                         if response and response.text:
-                            return f"🤖 AI Price Recommendation:\n{response.text}"
+                            ai_text = response.text
+                            recommended_price = self._extract_price_from_ai_response(ai_text, product_data)
+                            return {
+                                "predicted_price": recommended_price,
+                                "decision": "price_cut" if recommended_price < product_data['avg_price'] else "hold", 
+                                "llm_rationale": f"🤖 AI Recommendation (Retry): {ai_text[:200]}..." if len(ai_text) > 200 else f"🤖 AI Recommendation: {ai_text}",
+                                "source": "google_ai_retry"
+                            }
                     except:
                         pass  # Fall through to manual analysis
             
             # If all API attempts failed, provide manual analysis
-            return f"""🤖 AI Price Recommendation:
-⚠️ AI Model temporarily unavailable - Providing manual analysis instead.
-
-📊 Manual Price Analysis for {product_name}:
-- Current Price Range: ₹{product_data['min_price']:,.0f} - ₹{product_data['max_price']:,.0f}
-- Average Market Price: ₹{product_data['avg_price']:,.0f}
-- Estimated Cost (70% of lowest): ₹{estimated_cost:,.0f}
-
-💡 Recommended Competitive Price: ₹{int(product_data['min_price'] * 0.95):,.0f}
-   (5% below lowest competitor while maintaining healthy margins)
-
-📈 Reasoning: Positioned just below the lowest market price to ensure competitive advantage 
-   while maintaining healthy profit margins above estimated cost."""
+            recommended_price = int(product_data['min_price'] * 0.95)
+            return {
+                "predicted_price": recommended_price,
+                "decision": "price_cut" if recommended_price < product_data['avg_price'] else "hold",
+                "llm_rationale": f"⚠️ AI Model temporarily unavailable - Manual Analysis: Recommended ₹{recommended_price:,} (5% below lowest competitor). Positioned just below the lowest market price to ensure competitive advantage while maintaining healthy profit margins above estimated cost ₹{estimated_cost:,.0f}.",
+                "source": "manual_api_fallback",
+                "product_name": product_name,
+                "price_range": {
+                    "min": product_data['min_price'],
+                    "max": product_data['max_price'],
+                    "avg": product_data['avg_price']
+                }
+            }
             
         except Exception as e:
             print(f"❌ Critical error in prediction: {e}")
-            return f"❌ Error generating prediction for {product_name}: {str(e)}"
+            # Emergency fallback
+            emergency_price = int(product_data.get('min_price', 1000) * 0.98)
+            return {
+                "predicted_price": emergency_price,
+                "decision": "error",
+                "llm_rationale": f"❌ Error generating prediction for {product_name}: {str(e)}. Emergency fallback price: ₹{emergency_price:,}",
+                "source": "error_fallback",
+                "product_name": product_name,
+                "error": str(e)
+            }
     
     async def run_price_analysis(self):
         """Main function to run price analysis"""
@@ -594,29 +737,37 @@ Product: {product_name}
             print("💡 Try running scrapers to get comparable product data.")
             return
         
-        # Separate products by platform count
+        # ✅ IMPROVED: Separate products by platform count (now including single-platform)
         three_platform_products = [p for p in similar_products if p['platform_count'] == 3]
         two_platform_products = [p for p in similar_products if p['platform_count'] == 2]
+        single_platform_products = [p for p in similar_products if p['platform_count'] == 1]
         
-        if not three_platform_products and not two_platform_products:
-            print("❌ No matching products found across platforms with tight matching criteria.")
-            print("💡 This means products have different storage variants or naming that prevents exact matching.")
+        # ✅ RELAXED: Accept any products for analysis (was requiring 2+ platforms)
+        if not three_platform_products and not two_platform_products and not single_platform_products:
+            print("❌ No products found for analysis.")
             print("💡 Try running all scrapers to get more comprehensive data.")
             return
         
-        print(f"📊 STRICT MATCHING RESULTS:")
+        print(f"📊 RELAXED MATCHING RESULTS:")
         if three_platform_products:
             print(f"🌟 {len(three_platform_products)} products on ALL 3 platforms")
         if two_platform_products:
             print(f"🔵 {len(two_platform_products)} products on 2 platforms")
+        if single_platform_products:
+            print(f"🟡 {len(single_platform_products)} products on single platforms")
+        print(f"✅ Total analyzable products: {len(similar_products)}")
         print("=" * 60)
         
-        # Process 3-platform products first (priority)
+        # ✅ IMPROVED: Process products in priority order but include single-platform
         products_to_analyze = []
         if three_platform_products:
             products_to_analyze.extend(three_platform_products[:3])  # Top 3 three-platform products
         if two_platform_products and len(products_to_analyze) < 5:
             remaining_slots = 5 - len(products_to_analyze)
+            products_to_analyze.extend(two_platform_products[:remaining_slots])
+        if single_platform_products and len(products_to_analyze) < 5:
+            remaining_slots = 5 - len(products_to_analyze)
+            products_to_analyze.extend(single_platform_products[:remaining_slots])
             products_to_analyze.extend(two_platform_products[:remaining_slots])
         
         # Generate predictions for selected products
