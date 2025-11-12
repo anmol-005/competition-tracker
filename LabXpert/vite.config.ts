@@ -36,5 +36,19 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    hmr: {
+      overlay: true, // Keep error overlay enabled
+    },
+    proxy: {
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
+  define: {
+    // Ensure proper environment variable handling
+    __DEV__: process.env.NODE_ENV === "development",
   },
 });

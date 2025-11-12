@@ -3,12 +3,12 @@ import { ProductCard } from "@/components/ProductCard";
 import { useLocation } from "wouter";
 import { useProducts } from "@/hooks/use-products";
 
-// Import generated product images
-import macbookAirM2Midnight from "@assets/generated_images/MacBook_Air_M2_Midnight_5dac8d92.png";
-import macbookAirM2Starlight from "@assets/generated_images/MacBook_Air_M2_Starlight_29ce1c6c.png";
-import macbookProM3SpaceGrey from "@assets/generated_images/MacBook_Pro_M3_Space_Grey_62b40ab3.png";
-import macbookProM3ProSpaceBlack from "@assets/generated_images/MacBook_Pro_M3_Pro_Space_Black_faacdddf.png";
-import macbookAirM1Silver from "@assets/generated_images/MacBook_Air_M1_Silver_a8b9d4df.png";
+// Import generated product images (using placeholders)
+const macbookAirM2Midnight = "/images/macbook-air-midnight.jpg";
+const macbookAirM2Starlight = "/images/macbook-air-starlight.jpg";
+const macbookProM3SpaceGrey = "/images/macbook-pro-grey.jpg";
+const macbookProM3ProSpaceBlack = "/images/macbook-pro-black.jpg";
+const macbookAirM1Silver = "/images/macbook-air-silver.jpg";
 
 // Product images mapping with fallbacks
 const productImages: Record<string, string> = {
@@ -29,12 +29,12 @@ const productImages: Record<string, string> = {
 // Get appropriate image for product with smart fallbacks
 const getProductImage = (product: any): string => {
   // Try direct ASIN mapping first
-  if (productImages[product.ASIN]) {
+  if (product.ASIN && productImages[product.ASIN]) {
     return productImages[product.ASIN];
   }
   
   // Smart fallback based on product type
-  const modelName = product.Model_Name?.toLowerCase() || '';
+  const modelName = product.Model_Name?.toLowerCase() || product.name?.toLowerCase() || '';
   const color = product.Color?.toLowerCase() || '';
   
   if (modelName.includes('macbook air')) {
@@ -148,10 +148,10 @@ export default function ProductsPage() {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {products.map((product) => (
               <ProductCard
-                key={product.ASIN}
+                key={product.ASIN || product.id || product.name}
                 product={product}
                 imageSrc={getProductImage(product)}
-              />
+              /> 
             ))}
           </div>
         )}
