@@ -6,6 +6,8 @@ A comprehensive competitive intelligence tool for e-commerce businesses featurin
 
 ---
 
+## NOTE - ⚠️ This project is under active refinement. Some features may require configuration or environment setup to run locally.
+
 ## 🚀 Features
 
 ### 🤖 AI-Powered Price Intelligence
